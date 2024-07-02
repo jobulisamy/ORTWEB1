@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Button, Container, Grid, Link, TextField, Switch, FormControlLabel, Table, TableHead, TableBody, TableRow, TableCell, TableContainer } from '@mui/material';
 import './App.css';
 import Plot from 'react-plotly.js';
 import * as ort from 'onnxruntime-web/training';
-import { ImageData } from './data'; // Assuming you have ImageData class for handling cat and dog images
+import { ImageData } from './data';
 
-function App() {
+const App: React.FC = () => {
     // Constants
     const batchSize = 32;
     const numEpochs = 5;
@@ -55,14 +55,11 @@ function App() {
         messagesQueue = [];
     }
 
-        //example list of imagePaths
+    // Example list of imagePaths
     const imagePaths: string[] = [
         'path/to/image1.jpg',
         'path/to/image2.jpg',
     ];
-    
-
-    //const batchesGenerator = ImageData.trainingBatches(imagePaths);
 
     // Training and testing functions
     async function runTrainingEpoch(session: ort.TrainingSession, dataSet: ImageData, epoch: number) {
@@ -70,15 +67,15 @@ function App() {
         let totalNumBatches = dataSet.getNumTrainingBatches();
         const epochStartTime = Date.now();
         let iterationsPerSecond = 0;
-        await logMessage(`TRAINING | Epoch: ${String(epoch + 1).padStart(2)} / ${numEpochs} | Starting training...`)
+        await logMessage(`TRAINING | Epoch: ${String(epoch + 1).padStart(2)} / ${numEpochs} | Starting training...`);
         for await (const batch of dataSet.trainingBatches()) {
             ++batchNum;
             const feeds = {
                 input: batch.data,
                 labels: batch.labels
-            }
+            };
             const results = await session.runTrainStep(feeds);
-            const loss = parseFloat(results[lossNodeName].data);
+            const loss = parseFloat(results[lossNodeName].data as any);
             setTrainingLosses(losses => losses.concat(loss));
             iterationsPerSecond = batchNum / ((Date.now() - epochStartTime) / 1000);
             const message = `TRAINING | Epoch: ${String(epoch + 1).padStart(2)} | Batch ${String(batchNum).padStart(3)} / ${totalNumBatches} | Loss: ${loss.toFixed(4)} | ${iterationsPerSecond.toFixed(2)} it/s`;
@@ -96,15 +93,15 @@ function App() {
         let testPicsSoFar = 0;
         let accumulatedLoss = 0;
         const epochStartTime = Date.now();
-        await logMessage(`TESTING | Epoch: ${String(epoch + 1).padStart(2)} / ${numEpochs} | Starting testing...`)
+        await logMessage(`TESTING | Epoch: ${String(epoch + 1).padStart(2)} / ${numEpochs} | Starting testing...`);
         for await (const batch of dataSet.testBatches()) {
             ++batchNum;
             const feeds = {
                 input: batch.data,
                 labels: batch.labels
-            }
+            };
             const results = await session.runEvalStep(feeds);
-            const loss = parseFloat(results[lossNodeName].data);
+            const loss = parseFloat(results[lossNodeName].data as any);
             accumulatedLoss += loss;
             testPicsSoFar += batch.data.dims[0];
             numCorrect += countCorrectPredictions(results['output'], batch.labels);
@@ -155,7 +152,11 @@ function App() {
             return session;
         } catch (err) {
             setErrorMessage('Error loading the training session: ' + err);
-            console.log("Error loading the training session: " + err);
+            console.log("Error loading the training session: ", err);
+            console.log("Checkpoint Path: ", chkptPath);
+            console.log("Training Model Path: ", trainingPath);
+            console.log("Optimizer Model Path: ", optimizerPath);
+            console.log("Eval Model Path: ", evalPath);
             throw err;
         }
     }
@@ -195,6 +196,94 @@ function App() {
         }
         return maxIndex;
     }
-}
+
+    return (
+        <Container>
+            <h1>ONNX Runtime Web Training</h1>
+            <Grid container spacing={3}>
+                <Grid item xs={12}>
+                    <TextField
+                        label="Data Folder Path"
+                        value={dataFolderPath}
+                        onChange={(e) => setDataFolderPath(e.target.value)}
+                        fullWidth
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Max Number of Training Samples"
+                        type="number"
+                        value={maxNumTrainSamples}
+                        onChange={(e) => setMaxNumTrainSamples(Number(e.target.value))}
+                        fullWidth
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        label="Max Number of Testing Samples"
+                        type="number"
+                        value={maxNumTestSamples}
+                        onChange={(e) => setMaxNumTestSamples(Number(e.target.value))}
+                        fullWidth
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <FormControlLabel
+                        control={<Switch checked={enableLiveLogging} onChange={(e) => setEnableLiveLogging(e.target.checked)} />}
+                        label="Enable Live Logging"
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <Button variant="contained" color="primary" onClick={train} disabled={isTraining}>
+                        {isTraining ? 'Training...' : 'Start Training'}
+                    </Button>
+                </Grid>
+                <Grid item xs={12}>
+                    <h2>Status</h2>
+                    <p>{statusMessage}</p>
+                    {errorMessage && <p style={{ color: 'red' }}>{errorMessage}</p>}
+                </Grid>
+                <Grid item xs={12}>
+                    <h2>Logs</h2>
+                    <div style={{ maxHeight: '200px', overflowY: 'scroll' }}>
+                        {messages.map((msg, idx) => (
+                            <p key={idx}>{msg}</p>
+                        ))}
+                    </div>
+                </Grid>
+                <Grid item xs={12}>
+                    <h2>Training Losses</h2>
+                    <Plot
+                        data={[
+                            {
+                                x: trainingLosses.map((_, i) => i),
+                                y: trainingLosses,
+                                type: 'scatter',
+                                mode: 'lines+markers',
+                                marker: { color: 'red' },
+                            },
+                        ]}
+                        layout={{ width: 720, height: 440, title: 'Training Loss' }}
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <h2>Test Accuracies</h2>
+                    <Plot
+                        data={[
+                            {
+                                x: testAccuracies.map((_, i) => i),
+                                y: testAccuracies,
+                                type: 'scatter',
+                                mode: 'lines+markers',
+                                marker: { color: 'blue' },
+                            },
+                        ]}
+                        layout={{ width: 720, height: 440, title: 'Test Accuracy' }}
+                    />
+                </Grid>
+            </Grid>
+        </Container>
+    );
+};
 
 export default App;
