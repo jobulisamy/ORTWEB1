@@ -10,9 +10,13 @@ export class ImageData {
         this.dataFolderPath = dataFolderPath;
     }
 
-    public async prepareData() {
-        // No need to create labels.txt files anymore
-    }
+    public getNumTrainingBatches(): number {
+		return Math.floor(this.maxNumTrainSamples / this.batchSize)
+	}
+
+	public getNumTestBatches(): number {
+		return Math.floor(this.maxNumTestSamples / this.batchSize)
+	}
 
     public async * trainingBatches() {
         const trainingData = await this.loadData('train', this.maxNumTrainSamples);
@@ -92,7 +96,7 @@ export class ImageData {
         console.debug(`Loading files from "${folderName}".`);
         const response = await fetch(`${this.dataFolderPath}/${folderName}`);
         const text = await response.text();
-        const files = text.split('\n').filter(file => !!file);
+        const files = text.split('\n').filter(file => /\.(jpeg|jpg|png|bmp)$/i.test(file));
         return files;
     }
 }

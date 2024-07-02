@@ -55,13 +55,14 @@ function App() {
         messagesQueue = [];
     }
 
+        //example list of imagePaths
     const imagePaths: string[] = [
         'path/to/image1.jpg',
         'path/to/image2.jpg',
     ];
     
-    // Call the trainingBatches function with the imagePaths argument
-    const batchesGenerator = ImageData.trainingBatches(imagePaths);
+
+    //const batchesGenerator = ImageData.trainingBatches(imagePaths);
 
     // Training and testing functions
     async function runTrainingEpoch(session: ort.TrainingSession, dataSet: ImageData, epoch: number) {
